@@ -70,8 +70,11 @@ if __name__ == '__main__':
     dataset = NumberDataset(root_path, input_size=(28, 28), classes_num=NUMBER_CLASSES)
     # test_dataset = NumberDataset(root_path, input_size=(52, 52), phase="test")
 
-    dataloader = DataLoader(dataset, 8, True)
+    training_config = {
+        "batch_size": 80,
+        "epoch": 20
+    }
+    dataloader = DataLoader(dataset, training_config['batch_size'], True)
     # test_dataloader = DataLoader(test_dataset, 1, True)
-    epoch = 20
     writer = SummaryWriter()
-    train(model, dataloader, None, epoch, writer)
+    train(model, dataloader, None, training_config['epoch'], writer)

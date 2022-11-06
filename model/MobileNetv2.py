@@ -104,8 +104,8 @@ class MobileNetv2(nn.Module):
         phase_sequential.add_module('last_conv', ConvBNActivation(input_channel, output_channel, kernel_size=(1, 1)))
         phase_sequential.add_module('AdaptiveAvgPool2d', nn.AdaptiveAvgPool2d(output_size=(1, 1)))
         phase_sequential.add_module('output_layer', nn.Conv2d(in_channels=output_channel, out_channels=self.output_channels, kernel_size=1, stride=1))
+        phase_sequential.add_module('flatten', nn.Flatten(start_dim=1))
         self.phase.add_module(f"phase_{phase_count}", phase_sequential)
-
     def forward(self, x):
         output = self.phase(x)
         return output
