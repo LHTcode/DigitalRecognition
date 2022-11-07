@@ -66,6 +66,7 @@ class MobileNetv2(nn.Module):
         :param output_channels: 输出类别数量
         """
         super(MobileNetv2, self).__init__()
+        self.name = "MobileNetv2"
         self.output_channels = output_channels
         if inverted_residual_setting == None:
             inverted_residual_setting = [
