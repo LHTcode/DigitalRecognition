@@ -17,7 +17,7 @@ def compute_dataset_size(data_path) -> (int, dict, dict):
     choose_data = []
     choose_dict = {}
     for _, subdir_name, file_name in os.walk(data_path):
-        if subdir_name is not None:
+        if subdir_name:     # empty list is equivalent to false
             subdir_list.extend(subdir_name)
         if len(file_name) != 0:
             file_len.append(file_name)
@@ -28,7 +28,7 @@ def compute_dataset_size(data_path) -> (int, dict, dict):
     return data_num, data_dict, choose_dict
 
 class NumberDataset(Dataset):
-    def __init__(self, root_path, input_size: tuple, classes_num, phase="train", transform=None):
+    def __init__(self, root_path, input_size: tuple, classes_num, phase="train", use_onehot=True, transform=None):
         self.root_path = root_path
         self.input_size = input_size
         self.phase = phase
@@ -36,6 +36,7 @@ class NumberDataset(Dataset):
         self.dataset_size, self.data_dict, self.choose_dict = compute_dataset_size(str(Path(self.root_path) / Path(self.phase)))
         self.classes_num = classes_num
         self.device = global_config.DEVICE
+        self.use_onehot = use_onehot
 
     def __len__(self):
         return self.dataset_size
@@ -49,13 +50,13 @@ class NumberDataset(Dataset):
 
     def __getitem__(self, item):
         choose_list = list(self.choose_dict.keys())
-        choose_mask = item <= np.array(choose_list)
+        choose_mask = item < np.array(choose_list)
         label = ''
         index = 0
         for id, lb in enumerate(choose_mask):
             if lb:
                 label = self.choose_dict[choose_list[id]]
-                index = (item - choose_list[id - 1] - 1) if id != 0 else item - 1
+                index = (item - choose_list[id - 1]) if id != 0 else item
                 break
         img_name = self.data_dict[label][index]
         img_path = Path(self.root_path) / Path(self.phase) / Path(label) / Path(img_name)
@@ -69,11 +70,21 @@ class NumberDataset(Dataset):
         )
         padding_img = np.ones((*self.input_size, 1), dtype=resize_img.dtype) * 114
         padding_img[:resize_img.shape[0], :resize_img.shape[1], 0] = resize_img
-
         # padding_img = cv2.cvtColor(padding_img, cv2.COLOR_BGR2RGB, padding_img)
         padding_img = torch.from_numpy(padding_img).permute(2, 0, 1)
-        label = F.one_hot(torch.tensor(int(label)-1), num_classes=self.classes_num).to(self.device)
+        if self.use_onehot:
+            label = F.one_hot(torch.tensor(int(label)-1), num_classes=self.classes_num).to(self.device)
+        else:
+            label = int(label) - 1
         return padding_img.to(self.device).to(torch.float32), label
 
-
-
+    def eval(self, tp, fp) -> (dict, dict):
+        prec = {a: 0.0 for a in global_config.CLASSES_NAME.keys()}
+        rec = {a: 0.0 for a in global_config.CLASSES_NAME.keys()}
+        for cls in global_config.CLASSES_NAME.keys():
+            prec[cls] = tp[cls] / (tp[cls] + fp[cls] + 1e-8)
+            if str(cls) in self.data_dict.keys():
+                rec[cls] = tp[cls] / (len(self.data_dict[str(cls)]) + 1e-8)
+            else:
+                rec[cls] = 0.0
+        return prec, rec
