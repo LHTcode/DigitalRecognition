@@ -40,6 +40,10 @@ class RandomNoise(T.RandomErasing):
         return img
 
 class DataAugmentation:
+    CROP_AREA: float = 0.5
+    SHEAR_DEGREES: int = 45
+    WHITE_POINT_AREA: float = 0.0006    #
+
     """Provide some data augmentation method.
 
     Note: You should give names of some data argumentation methods name,
@@ -55,9 +59,11 @@ class DataAugmentation:
         self.transforms_compose = list()
         for method in methods:
             if method == 'random_resized_crop':
-                self.transforms_compose.append(self._get_random_resized_crop(self.img_shape))
+                self.transforms_compose.append(self._get_random_resized_crop(self.CROP_AREA, self.img_shape))
+            elif method == 'random_affine':
+                self.transforms_compose.append(self._get_random_affine(self.SHEAR_DEGREES))
             elif method == 'random_noise':
-                self.transforms_compose.append(self._get_random_noise())
+                self.transforms_compose.append(self._get_random_noise(self.WHITE_POINT_AREA))
             elif method == 'mix_up':
                 pass
             elif method == 'cut_mix':
@@ -69,24 +75,32 @@ class DataAugmentation:
         return T.Compose(self.transforms_compose)
 
     @staticmethod
-    def _get_random_resized_crop(img_shape: namedtuple) -> torch.nn.Module:
+    def _get_random_resized_crop(crop_area: float, img_shape: namedtuple) -> torch.nn.Module:
         h, w = img_shape.H, img_shape.W
         r = w / h
         transform = T.RandomResizedCrop(
             size=(h, w),
-            scale=(0.5, 1),
+            scale=(crop_area, 1),
             ratio=(r, r),
-            interpolation=T.InterpolationMode.BICUBIC,
+            interpolation=T.InterpolationMode.NEAREST,
         )
         return transform
 
     @staticmethod
-    def _get_random_noise() -> torch.nn.Module:
+    def _get_random_affine(shear_degrees) -> torch.nn.Module:
+        transform = T.RandomAffine(
+            (0, 0), # no rotation rigid transformation
+            shear=(0, shear_degrees)   # shearing on x axis
+        )
+        return transform
+
+    @staticmethod
+    def _get_random_noise(white_point_area: float) -> torch.nn.Module:
         transform = RandomNoise(
             p=0.5,
-            scale=(0.0006, 0.0006),
+            scale=(white_point_area, white_point_area),
             ratio=(1, 1),
-            erasing_area=120
+            erasing_area=150
         )
         return transform
 
