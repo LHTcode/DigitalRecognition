@@ -72,6 +72,20 @@ class DataAugmentation:
                 print(f"Warning: method named {method} is no found!")
 
     def get_data_argumentation_compose(self) -> T.Compose:
+        """Get some data argumentation methods by torchvision.transform.Compose format.
+
+        Effects test:
+        >>> import cv2
+        >>> dataset_path = global_config.DATASET_PATH
+        >>> src_img = cv2.imread(dataset_path + "/train" + '/2' + '/252.png', cv2.IMREAD_GRAYSCALE)
+        >>> src_img = torch.from_numpy(src_img)
+        >>> data_arug = DataAugmentation(('random_resized_crop', 'random_affine', 'random_noise'), src_img.shape)
+        >>> transform = data_arug.get_data_argumentation_compose()
+        >>> for i in range(10):
+        ...     random_resized_crop_img = transform(src_img.unsqueeze(0))
+        ...     cv2.imshow("random_resized_crop_img", random_resized_crop_img.squeeze().numpy())
+        ...     _ = cv2.waitKey(0)
+        """
         return T.Compose(self.transforms_compose)
 
     @staticmethod
@@ -114,13 +128,5 @@ class DataAugmentation:
 
 
 if __name__ == '__main__':
-    import cv2
-    dataset_path = global_config.DATASET_PATH
-    src_img = cv2.imread(dataset_path + "/train" + '/2' + '/252.png', cv2.IMREAD_GRAYSCALE)
-    src_img = torch.from_numpy(src_img)
-    data_arug = DataAugmentation(('random_resized_crop', 'random_noise'), src_img.shape)
-    transform = data_arug.get_data_argumentation_compose()
-    for i in range(10):
-        random_resized_crop_img = transform(src_img.unsqueeze(0))
-        cv2.imshow("random_resized_crop_img", random_resized_crop_img.squeeze().numpy())
-        cv2.waitKey(0)
+    import doctest
+    doctest.testmod(verbose=True)
