@@ -3,7 +3,7 @@ from torchvision import transforms as T
 from torchvision.transforms import functional as F
 from config.global_config import global_config
 from collections import namedtuple
-from typing import Tuple
+from typing import Tuple, List
 
 class RandomNoise(T.RandomErasing):
     """Make some white point noise.
@@ -42,7 +42,8 @@ class RandomNoise(T.RandomErasing):
 class DataAugmentation:
     CROP_AREA: float = 0.5
     SHEAR_DEGREES: int = 45
-    WHITE_POINT_AREA: float = 0.0006    #
+    WHITE_POINT_AREA: float = 0.0006
+    METHODS_LIST: List[str] = ['random_resized_crop', 'random_affine', 'random_noise']
 
     """Provide some data augmentation method.
 
@@ -50,28 +51,17 @@ class DataAugmentation:
     and use get_data_argumentation_compose method to get a transform compose.
 
     Args:
-        methods (tuple of str): except some data argumentation methods name.
-        img_shape (tuple of int): except the img shape that require data argumentation.
+        methods (list of str): except some data argumentation methods name.
     """
-    def __init__(self, methods: Tuple[str, ...], img_shape: Tuple[int, int]):
-        Shape = namedtuple(typename="img_shape", field_names=['H', 'W'])
-        self.img_shape = Shape(img_shape[0], img_shape[1])
-        self.transforms_compose = list()
-        for method in methods:
-            if method == 'random_resized_crop':
-                self.transforms_compose.append(self._get_random_resized_crop(self.CROP_AREA, self.img_shape))
-            elif method == 'random_affine':
-                self.transforms_compose.append(self._get_random_affine(self.SHEAR_DEGREES))
-            elif method == 'random_noise':
-                self.transforms_compose.append(self._get_random_noise(self.WHITE_POINT_AREA))
-            elif method == 'mix_up':
-                pass
-            elif method == 'cut_mix':
-                pass
-            else:
+    def __init__(self, methods: List[str]):
+        self.methods = methods
+        self.Shape = namedtuple(typename="img_shape", field_names=['H', 'W'])
+        for idx, method in enumerate(self.methods):
+            if method not in self.METHODS_LIST:
                 print(f"Warning: method named {method} is no found!")
+                del self.methods[idx]
 
-    def get_data_argumentation_compose(self) -> T.Compose:
+    def get_data_argumentation_compose(self, img_shape: Tuple[int, int]) -> T.Compose:
         """Get some data argumentation methods by torchvision.transform.Compose format.
 
         Effects test:
@@ -79,14 +69,24 @@ class DataAugmentation:
         >>> dataset_path = global_config.DATASET_PATH
         >>> src_img = cv2.imread(dataset_path + "/train" + '/2' + '/252.png', cv2.IMREAD_GRAYSCALE)
         >>> src_img = torch.from_numpy(src_img)
-        >>> data_arug = DataAugmentation(('random_resized_crop', 'random_affine', 'random_noise'), src_img.shape)
-        >>> transform = data_arug.get_data_argumentation_compose()
+        >>> data_arug = DataAugmentation(['random_resized_crop', 'random_affine', 'random_noise'])
+        >>> transform = data_arug.get_data_argumentation_compose(src_img.shape)
         >>> for i in range(10):
         ...     random_resized_crop_img = transform(src_img.unsqueeze(0))
         ...     cv2.imshow("random_resized_crop_img", random_resized_crop_img.squeeze().numpy())
         ...     _ = cv2.waitKey(0)
         """
-        return T.Compose(self.transforms_compose)
+        img_shape = self.Shape(*img_shape)
+        transforms_compose = list()
+        transforms_compose.append(T.ToTensor())
+        for method in self.methods:
+            if method == 'random_resized_crop':
+                transforms_compose.append(self._get_random_resized_crop(self.CROP_AREA, img_shape))
+            elif method == 'random_affine':
+                transforms_compose.append(self._get_random_affine(self.SHEAR_DEGREES))
+            elif method == 'random_noise':
+                transforms_compose.append(self._get_random_noise(self.WHITE_POINT_AREA))
+        return T.Compose(transforms_compose)
 
     @staticmethod
     def _get_random_resized_crop(crop_area: float, img_shape: namedtuple) -> torch.nn.Module:
