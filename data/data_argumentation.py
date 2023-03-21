@@ -41,9 +41,11 @@ class RandomNoise(T.RandomErasing):
 
 class DataAugmentation:
     CROP_AREA: float = 0.5
-    SHEAR_DEGREES: int = 45
+    SHEAR_DEGREES: int = 8
+    WHITE_POINT_PROBABILITY: float = 0.3
     WHITE_POINT_AREA: float = 0.0006
-    METHODS_LIST: List[str] = ['random_resized_crop', 'random_affine', 'random_noise']
+    NOISE_AREA: float = 70
+    METHODS_LIST: List[str] = ['random_resized_crop']
 
     """Provide some data augmentation method.
 
@@ -61,6 +63,47 @@ class DataAugmentation:
                 print(f"Warning: method named {method} is no found!")
                 del self.methods[idx]
 
+    def __repr__(self):
+        pass    # TODO:
+
+    @staticmethod
+    def _get_random_resized_crop(crop_area: float, img_shape: namedtuple) -> torch.nn.Module:
+        h, w = img_shape.H, img_shape.W
+        r = w / h
+        transform = T.RandomResizedCrop(
+            size=(h, w),
+            scale=(crop_area, 1),
+            ratio=(r, r),
+            interpolation=T.InterpolationMode.BILINEAR,
+        )
+        return transform
+
+    @staticmethod
+    def _get_random_affine(shear_degrees) -> torch.nn.Module:
+        transform = T.RandomAffine(
+            (0, 0),  # no rotation rigid transformation
+            shear=(0, shear_degrees)   # shearing on x axis
+        )
+        return transform
+
+    @staticmethod
+    def _get_random_noise(probability, white_point_area: float, noise_area: float) -> torch.nn.Module:
+        transform = RandomNoise(
+            p=probability,
+            scale=(white_point_area, white_point_area),
+            ratio=(1, 1),
+            erasing_area=noise_area
+        )
+        return transform
+
+    @staticmethod
+    def _get_mix_up():
+        pass
+
+    @staticmethod
+    def _get_cut_mix():
+        pass
+
     def get_data_argumentation_compose(self, img_shape: Tuple[int, int]) -> T.Compose:
         """Get some data argumentation methods by torchvision.transform.Compose format.
 
@@ -68,11 +111,10 @@ class DataAugmentation:
         >>> import cv2
         >>> dataset_path = global_config.DATASET_PATH
         >>> src_img = cv2.imread(dataset_path + "/train" + '/2' + '/252.png', cv2.IMREAD_GRAYSCALE)
-        >>> src_img = torch.from_numpy(src_img)
         >>> data_arug = DataAugmentation(['random_resized_crop', 'random_affine', 'random_noise'])
         >>> transform = data_arug.get_data_argumentation_compose(src_img.shape)
         >>> for i in range(10):
-        ...     random_resized_crop_img = transform(src_img.unsqueeze(0))
+        ...     random_resized_crop_img = transform(src_img)
         ...     cv2.imshow("random_resized_crop_img", random_resized_crop_img.squeeze().numpy())
         ...     _ = cv2.waitKey(0)
         """
@@ -85,46 +127,8 @@ class DataAugmentation:
             elif method == 'random_affine':
                 transforms_compose.append(self._get_random_affine(self.SHEAR_DEGREES))
             elif method == 'random_noise':
-                transforms_compose.append(self._get_random_noise(self.WHITE_POINT_AREA))
+                transforms_compose.append(self._get_random_noise(self.WHITE_POINT_PROBABILITY, self.WHITE_POINT_AREA, self.NOISE_AREA))
         return T.Compose(transforms_compose)
-
-    @staticmethod
-    def _get_random_resized_crop(crop_area: float, img_shape: namedtuple) -> torch.nn.Module:
-        h, w = img_shape.H, img_shape.W
-        r = w / h
-        transform = T.RandomResizedCrop(
-            size=(h, w),
-            scale=(crop_area, 1),
-            ratio=(r, r),
-            interpolation=T.InterpolationMode.NEAREST,
-        )
-        return transform
-
-    @staticmethod
-    def _get_random_affine(shear_degrees) -> torch.nn.Module:
-        transform = T.RandomAffine(
-            (0, 0), # no rotation rigid transformation
-            shear=(0, shear_degrees)   # shearing on x axis
-        )
-        return transform
-
-    @staticmethod
-    def _get_random_noise(white_point_area: float) -> torch.nn.Module:
-        transform = RandomNoise(
-            p=0.5,
-            scale=(white_point_area, white_point_area),
-            ratio=(1, 1),
-            erasing_area=150
-        )
-        return transform
-
-    @staticmethod
-    def _get_mix_up():
-        pass
-
-    @staticmethod
-    def _get_cut_mix():
-        pass
 
 
 if __name__ == '__main__':

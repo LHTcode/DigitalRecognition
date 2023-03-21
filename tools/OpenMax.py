@@ -7,9 +7,10 @@ from pathlib import Path
 from tqdm import tqdm
 
 from model.MobileNetv2 import MobileNetv2
+from model.LeNet5 import LeNet5
 from data.dataset import NumberDataset
-from data.classes import NUMBER_CLASSES, CLASSES_NAME
 from config.global_config import global_config
+from model.Linear import Linear
 
 @torch.no_grad()
 def compute_weibull(model, input_size) -> (dict, list):
@@ -20,14 +21,14 @@ def compute_weibull(model, input_size) -> (dict, list):
     model.to(torch.device("cuda:0"))
     model.eval()    # TODO: 先尝试将model置为eval()，不清楚模型去掉了训练时所用到的一些方法会不会有影响
 
-    dataset = NumberDataset(global_config.DATASET_PATH, input_size=input_size, classes_num=NUMBER_CLASSES)
+    dataset = NumberDataset(global_config.DATASET_PATH, input_size=input_size, classes_num=global_config.CLASSES_NUM, use_argumentation=False)
     dataloader = DataLoader(dataset, 8, True)
 
-    # mu = torch.zeros((NUMBER_CLASSES), dtype=torch.float64, device=global_config.DEVICE)
-    mu = torch.zeros((NUMBER_CLASSES, NUMBER_CLASSES), dtype=torch.float64, device=global_config.DEVICE)
-    # S = torch.empty((NUMBER_CLASSES, 0, NUMBER_CLASSES), dtype=torch.float64, device=global_config.DEVICE)
-    S = {a: torch.empty(0, NUMBER_CLASSES, dtype=torch.float64, device=global_config.DEVICE) for a in CLASSES_NAME.keys()}
-    # S = {a: torch.empty(0, dtype=torch.float64, device=global_config.DEVICE) for a in CLASSES_NAME.keys()}
+    # mu = torch.zeros((global_config.CLASSES_NUM), dtype=torch.float64, device=global_config.DEVICE)
+    mu = torch.zeros((global_config.CLASSES_NUM, global_config.CLASSES_NUM), dtype=torch.float64, device=global_config.DEVICE)
+    # S = torch.empty((global_config.CLASSES_NUM, 0, global_config.CLASSES_NUM), dtype=torch.float64, device=global_config.DEVICE)
+    S = {a: torch.empty(0, global_config.CLASSES_NUM, dtype=torch.float64, device=global_config.DEVICE) for a in global_config.CLASSES_NAME.keys()}
+    # S = {a: torch.empty(0, dtype=torch.float64, device=global_config.DEVICE) for a in global_config.CLASSES_NAME.keys()}
 
     print(f"Start to compute {global_config.MODEL_NAME} weibull...")
     data_loop = tqdm(dataloader)
@@ -42,9 +43,9 @@ def compute_weibull(model, input_size) -> (dict, list):
         mu[cls-1] = torch.sum(S[cls], dim=0) / S[cls].shape[0]
     #=============== EVT Fit ===============#
     eta = 10
-    rou_mr = {a: libmr.MR() for a in CLASSES_NAME.keys()}
+    rou_mr = {a: libmr.MR() for a in global_config.CLASSES_NAME.keys()}
     rou = {}
-    for cls in CLASSES_NAME.keys():
+    for cls in global_config.CLASSES_NAME.keys():
         # print(torch.pow(torch.sum(torch.pow(S[cls] - mu[cls-1], 2), dim=0), 0.5))
         rou_mr[cls].fit_high(torch.pow(torch.sum(torch.pow(S[cls] - mu[cls-1], 2), dim=1), 0.5).tolist(), eta)
         rou[cls] = [*rou_mr[cls].get_params()]
@@ -62,7 +63,9 @@ def save_weibull_params(rou, mu) -> None:
     return
 
 if __name__ == '__main__':
-    model = MobileNetv2(wid_mul=1, output_channels=NUMBER_CLASSES).to("cuda:0")
+    model = MobileNetv2(wid_mul=0.6, output_channels=global_config.CLASSES_NUM).to("cuda:0")
+    # model = LeNet5(8, True)
+    # model = Linear()
     rou, mu = compute_weibull(model, input_size=global_config.INPUT_SIZE)
     #========= save weibull params =========#
     save_weibull_params(rou, mu)

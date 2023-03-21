@@ -10,7 +10,7 @@ from config.global_config import global_config
 from data.data_argumentation import DataAugmentation
 
 class NumberDataset(Dataset):
-    def __init__(self, root_path, input_size: tuple, classes_num, phase="train", use_onehot=True, transform=None):
+    def __init__(self, root_path, input_size: tuple, classes_num, phase="train", use_onehot=True, transform=None, use_argumentation=True):
         self.root_path = root_path
         self.input_size = input_size
         self.phase = phase
@@ -19,7 +19,11 @@ class NumberDataset(Dataset):
         self.classes_num = classes_num
         self.device = global_config.DEVICE
         self.use_onehot = use_onehot
-        self.data_argumentation = DataAugmentation(['random_resized_crop', 'random_affine', 'random_noise'])    # TODO: 暂时这样写死
+        self.use_argumentation = use_argumentation
+        if self.use_argumentation:
+            self.data_argumentation = DataAugmentation(
+                ['random_resized_crop', 'random_affine', 'random_noise']
+            )    # TODO: 暂时这样写死
 
     def __len__(self):
         return self.dataset_size
@@ -83,8 +87,11 @@ class NumberDataset(Dataset):
 
     def __getitem__(self, item):
         img, label = self.get_img_and_label(item)
-        transforms = self.data_argumentation.get_data_argumentation_compose(img.shape)
-        transforms_img = transforms(img)
+        if self.use_argumentation:
+            transforms = self.data_argumentation.get_data_argumentation_compose(img.shape)
+            transforms_img = transforms(img)
+        else:
+            transforms_img = img
         padding_img = self.resize_and_padding_img(transforms_img)   # TODO: should resize use Tensor?
         padding_img = torch.from_numpy(padding_img).permute(2, 0, 1)
 

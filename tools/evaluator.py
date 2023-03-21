@@ -1,26 +1,28 @@
 import torch
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch import nn
 
 from config.global_config import global_config
 
 @torch.no_grad()
-def evaluate(model, test_dataloader, model_save_path):
+def evaluate(model, test_dataloader: DataLoader, model_save_path):
     import numpy as np
     print(f"Testing {model.name}...\n")
     model.load_state_dict(torch.load(model_save_path, map_location=torch.device(global_config.DEVICE))["state"])
     model.eval()
+    model.half()
     activate_func = nn.Softmax(dim=1)
 
     precs = {a: np.empty(0) for a in global_config.CLASSES_NAME.keys()}
     recs = {a: np.empty(0) for a in global_config.CLASSES_NAME.keys()}
-    threshold_loop = tqdm(np.arange(0.4, 1.0, 0.05))
+    threshold_loop = tqdm(np.arange(0.1, 1.0, 0.05))
     for threshold in threshold_loop:
         tp = {a: 0 for a in global_config.CLASSES_NAME.keys()}
         fp = {a: 0 for a in global_config.CLASSES_NAME.keys()}
         test_loop = tqdm(test_dataloader)
         for imgs, labels in test_loop:
-            outputs = model(imgs)
+            outputs = model(imgs.half())
             outputs = activate_func(outputs)
             pred = torch.max(outputs, dim=1)
             for idx, label in enumerate(labels):

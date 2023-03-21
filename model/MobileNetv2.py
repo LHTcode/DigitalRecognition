@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from data.classes import NUMBER_CLASSES
+from config.global_config import global_config
 
 class ConvBNActivation(nn.Module):
     def __init__(self,
@@ -55,15 +55,15 @@ class MobileNetv2(nn.Module):
                  resolu_mul=1.0,
                  round_nearest=8,
                  inverted_residual_setting=None,
-                 output_channels=NUMBER_CLASSES,
+                 output_channels=global_config.CLASSES_NUM,
                  ):
         """
         Args:
-        :param wid_mul: 宽度乘子，用于控制mobilenet每一层的channel
-        :param resolu_mul: 分辨率乘子，用于控制每一层的输入分辨率的大小
-        :param round_nearest: Round the number of channels in each layer to be a multiple of this number. Set to 1 to turn off rounding
-        :param inverted_residual_setting: 逆残差连接的配置, [t, c, n, s]
-        :param output_channels: 输出类别数量
+        wid_mul: 宽度乘子，用于控制mobilenet每一层的channel
+        resolu_mul: 分辨率乘子，用于控制每一层的输入分辨率的大小
+        round_nearest: Round the number of channels in each layer to be a multiple of this number. Set to 1 to turn off rounding
+        inverted_residual_setting: 逆残差连接的配置, [t, c, n, s]
+        output_channels: 输出类别数量
         """
         super(MobileNetv2, self).__init__()
         self.name = "MobileNetv2"
@@ -82,7 +82,7 @@ class MobileNetv2(nn.Module):
             raise ValueError("Please give a right format inverted residual setting.")
         input_channel = 32
 
-        input_channel = self._make_divisible(input_channel*min(1.0, wid_mul), round_nearest)
+        input_channel = self.__make_divisible(input_channel*min(1.0, wid_mul), round_nearest)
         self.phase = nn.Sequential()     # 按照 feature_map size 是否改变来划分阶段
         phase_sequential = nn.Sequential()
         phase_count = 0
@@ -90,7 +90,7 @@ class MobileNetv2(nn.Module):
         phase_sequential.add_module(f'InvertedResidual_{inverted_residual_count}', ConvBNActivation(1, input_channel, kernel_size=(3, 3), stride=2))
         inverted_residual_count += 1
         for t, c, n, s in inverted_residual_setting:
-            output_channel = self._make_divisible(c*min(1.0, wid_mul), round_nearest)
+            output_channel = self.__make_divisible(c*min(1.0, wid_mul), round_nearest)
             if s == 2:
                 self.phase.add_module(f"phase_{phase_count}", phase_sequential)
                 phase_count += 1
@@ -101,18 +101,19 @@ class MobileNetv2(nn.Module):
                 phase_sequential.add_module(f'InvertedResidual_{inverted_residual_count}', InvertedResidual(input_channel, output_channel, stride, t))
                 input_channel = output_channel
                 inverted_residual_count += 1
-        output_channel = self._make_divisible(1280*min(1.0, wid_mul), round_nearest)
+        output_channel = self.__make_divisible(1280*min(1.0, wid_mul), round_nearest)
         phase_sequential.add_module('last_conv', ConvBNActivation(input_channel, output_channel, kernel_size=(1, 1)))
         phase_sequential.add_module('AdaptiveAvgPool2d', nn.AdaptiveAvgPool2d(output_size=(1, 1)))
         phase_sequential.add_module('output_layer', nn.Conv2d(in_channels=output_channel, out_channels=self.output_channels, kernel_size=1, stride=1))
         phase_sequential.add_module('flatten', nn.Flatten(start_dim=1))
         self.phase.add_module(f"phase_{phase_count}", phase_sequential)
+
     def forward(self, x):
         output = self.phase(x)
         return output
 
 
-    def _make_divisible(self, v: float, divisor: int, min_value=None) -> int:
+    def __make_divisible(self, v: float, divisor: int, min_value=None) -> int:
         """
         This function is taken from the original tf repo.
         It ensures that all layers have a channel number that is divisible by 8

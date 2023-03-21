@@ -3,8 +3,8 @@ import torch
 from pathlib import Path
 
 from model.MobileNetv2 import MobileNetv2
-from model.LeNet import LeNet
-from data.classes import NUMBER_CLASSES, CLASSES_NAME
+from model.LeNet5 import LeNet5
+from model.Linear import Linear
 from config.global_config import global_config
 
 def convert_ONNX(model, param_dir, input_size:tuple):
@@ -12,7 +12,7 @@ def convert_ONNX(model, param_dir, input_size:tuple):
     model_params = torch.load(param_file, map_location="cuda:0")
     model.load_state_dict(model_params['state'])
     model.eval()
-    dummy_input = torch.randn(1, (1, *input_size), requires_grad=True)
+    dummy_input = torch.randn((1, 1, *input_size), requires_grad=True)
     torch.onnx.export(model,  # model_params being run
                       dummy_input,  # model_params input (or a tuple for multiple inputs)
                       str(Path(param_dir) / (global_config.MODEL_NAME + ".onnx")),  # where to save the model_params
@@ -29,7 +29,8 @@ def convert_ONNX(model, param_dir, input_size:tuple):
 
 if __name__ == '__main__':
     root_path = Path.cwd().parent
-    model = MobileNetv2(wid_mul=1, output_channels=NUMBER_CLASSES)
-    # model = LeNet(global_config.CLASSES_NUM)
+    model = MobileNetv2(wid_mul=0.6, output_channels=global_config.CLASSES_NUM)
+    # model = LeNet5(8, True)
+    # model = Linear()
     param_dir = root_path / 'model_params'
     convert_ONNX(model, str(param_dir), global_config.INPUT_SIZE)
